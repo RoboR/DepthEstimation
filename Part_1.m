@@ -2,10 +2,11 @@ clc;
 clear;
 addpath(genpath('./GCMex'))
 
-SOURCE_COLOR    = uint8([0; 0; 255]);        % blue
-SINK_COLOR      = uint8([245; 210; 110]);    % yellow
-PRIOR_SMOOTHNESS = 200;
-DATA_SMOOTHNESS = 50;
+SOURCE_COLOR        = uint8([0; 0; 255]);        % blue
+SINK_COLOR          = uint8([245; 210; 110]);    % yellow
+PRIOR_SMOOTHNESS    = 175;
+DATA_SMOOTHNESS     = 250;
+
 
 raw_image                   = imread("input/bayes_in.jpg");
 % raw_image                   = imread("input/Untitled.jpg");
@@ -28,22 +29,45 @@ for row = 0 : height_h - 1
         if (col + 1) < width_w            
             right_val   = raw_image((row + 1), (col + 1 + 1), :);
             right_dist  = pixel_distance_func(value_d(:), right_val(:));
-            if (right_dist < DATA_SMOOTHNESS)
-                pairwise(pixel, (1 + col + 1) + row * width_w) = 1; 
+            prior_right  = 1;
+            if (right_dist > DATA_SMOOTHNESS)
+                prior_right = 0;
             end
+            pairwise(pixel, (1 + col + 1) + row * width_w) = prior_right;
         end
 
         % bottom neightbour
         if row + 1 < height_h 
             bottom_val   = raw_image((row + 1 + 1), (col + 1), :);
             bottom_dist  = pixel_distance_func(value_d(:), bottom_val(:));
-            if (bottom_dist < DATA_SMOOTHNESS)
-                pairwise(pixel, (1 + col) + (row + 1) * width_w) = 1; 
+            prior_bottom = 1;
+            if (bottom_dist > DATA_SMOOTHNESS)
+                prior_bottom = 0;
             end
+            pairwise(pixel, (1 + col) + (row + 1) * width_w) = prior_bottom;
         end
         
-        if row-1 >= 0, pairwise(pixel, 1+col+(row-1)*width_w) = 1; end 
-        if col-1 >= 0, pairwise(pixel, 1+(col-1)+row*width_w) = 1; end 
+        % top neighbour
+        if row-1 >= 0
+            top_val   = raw_image((row + 1 -1), (col + 1), :);
+            top_dist  = pixel_distance_func(value_d(:), top_val(:));
+            prior_top = 1;
+            if (top_dist > DATA_SMOOTHNESS)
+                prior_top = 0;
+            end
+            pairwise(pixel, 1+col+(row-1)*width_w) = prior_top;
+        end
+
+        % left neighbour
+        if col - 1 >= 0
+            left_val   = raw_image((row + 1), (col + 1 -1), :);
+            left_dist  = pixel_distance_func(value_d(:), left_val(:));
+            prior_left = 1;
+            if (left_dist > DATA_SMOOTHNESS)
+                prior_left = 0;
+            end
+                pairwise(pixel, 1+(col-1)+row*width_w) = prior_left;
+        end
 
         % foreground
         fg_d = pixel_distance_func(value_d(:), SOURCE_COLOR);        
