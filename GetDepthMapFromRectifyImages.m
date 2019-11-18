@@ -1,4 +1,4 @@
-function [depth_map] = GetDepthMapFromTwoImages(left_image, right_image, patch_size)
+function [depth_map] = GetDepthMapFromRectifyImages(left_image, right_image, patch_size)
     RIGHT_IMG_STEP  = 5;
     SEARCH_DIST     = 200;
     MAX_DEPTH       = SEARCH_DIST;
@@ -50,25 +50,3 @@ function [depth_map] = GetDepthMapFromTwoImages(left_image, right_image, patch_s
     end
 end
 
-
-function dist = ssd_image_distance(img_1, img_2)
-    diff = int8(img_1) - int8(img_2);
-    dist = sum(diff(:).^2);
-end
-
-function [valid, image_patch] = obtain_image_patch(row, col, patch_width, image)
-    valid       = false;
-    image_patch = [];
-    [height, width, d] = size(image);
-
-    start_col   = col - patch_width;
-    start_row   = row - patch_width;
-    end_col     = start_col + patch_width * 2;
-    end_row     = start_row + patch_width * 2;
-
-    if (start_col > 0) && (start_row > 0) && ...
-       (end_col < width) && (end_row < height)
-        valid       = true;
-        image_patch = image(start_row : end_row, start_col : end_col, :);
-    end
-end

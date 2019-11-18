@@ -2,79 +2,76 @@ clc;
 clear;
 addpath(genpath('./GCMex'))
 
-SOURCE_COLOR        = uint8([0; 0; 255]);        % blue
-SINK_COLOR          = uint8([245; 210; 110]);    % yellow
-PRIOR_SMOOTHNESS    = 175;
-DATA_SMOOTHNESS     = 250;
+FG_COLOR            = uint8([0; 0; 255]);        % blue
+BG_COLOR            = uint8([245; 210; 110]);    % yellow
+PRIOR_SMOOTHNESS    = 50;
+DATA_SMOOTHNESS     = 200;
 
 
 raw_image                   = imread("input/bayes_in.jpg");
-% raw_image                   = imread("input/Untitled.jpg");
-[height_h, width_w, z]      = size(raw_image);
-nodes_n                     = width_w * height_h;
+[height, width, z]          = size(raw_image);
+nodes_n                     = width * height;
 segclass                    = zeros(nodes_n, 1);
 pairwise                    = sparse(nodes_n, nodes_n);
-data_term_n                 = 2; % binary
-unary                       = zeros(data_term_n, nodes_n);
-[X, Y]                      = meshgrid(1:data_term_n, 1:data_term_n);
-labelcost                   = min(4, (X - Y) .* (X - Y));
+depthMax                    = 2; % binary
+unary                       = zeros(depthMax, nodes_n);
+[X, Y]                      = meshgrid(0 : depthMax - 1, 0 : depthMax - 1);
+labelcost                   = (X - Y) .* (X - Y);
 
-
-for row = 0 : height_h - 1
-    for col = 0 : width_w - 1
-        pixel   = 1 + row * width_w + col;
-        value_d = raw_image(row + 1, col + 1, :);
+for row = 0 : height - 1
+    for col = 0 : width - 1
+        node_idx    = 1 + row * width + col;
+        value_d     = raw_image(row + 1, col + 1, :);
                 
         % right neighbour
-        if (col + 1) < width_w            
+        if (col + 2) <= width            
             right_val   = raw_image((row + 1), (col + 1 + 1), :);
             right_dist  = pixel_distance_func(value_d(:), right_val(:));
             prior_right  = 1;
-            if (right_dist > DATA_SMOOTHNESS)
+            if (right_dist < PRIOR_SMOOTHNESS)
                 prior_right = 0;
             end
-            pairwise(pixel, (1 + col + 1) + row * width_w) = prior_right;
+            pairwise(node_idx, (col + 2) + row * width) = prior_right;
         end
 
         % bottom neightbour
-        if row + 1 < height_h 
+        if row + 2 <= height 
             bottom_val   = raw_image((row + 1 + 1), (col + 1), :);
             bottom_dist  = pixel_distance_func(value_d(:), bottom_val(:));
             prior_bottom = 1;
-            if (bottom_dist > DATA_SMOOTHNESS)
+            if (bottom_dist < PRIOR_SMOOTHNESS)
                 prior_bottom = 0;
             end
-            pairwise(pixel, (1 + col) + (row + 1) * width_w) = prior_bottom;
+            pairwise(node_idx, (col + 1) + (row + 1) * width) = prior_bottom;
         end
         
         % top neighbour
-        if row-1 >= 0
+        if row > 0
             top_val   = raw_image((row + 1 -1), (col + 1), :);
             top_dist  = pixel_distance_func(value_d(:), top_val(:));
             prior_top = 1;
-            if (top_dist > DATA_SMOOTHNESS)
+            if (top_dist < PRIOR_SMOOTHNESS)
                 prior_top = 0;
             end
-            pairwise(pixel, 1+col+(row-1)*width_w) = prior_top;
+            pairwise(node_idx, 1 + col + (row - 1) * width) = prior_top;
         end
 
         % left neighbour
-        if col - 1 >= 0
+        if col > 0
             left_val   = raw_image((row + 1), (col + 1 -1), :);
             left_dist  = pixel_distance_func(value_d(:), left_val(:));
             prior_left = 1;
-            if (left_dist > DATA_SMOOTHNESS)
+            if (left_dist < PRIOR_SMOOTHNESS)
                 prior_left = 0;
             end
-                pairwise(pixel, 1+(col-1)+row*width_w) = prior_left;
+            pairwise(node_idx, col + row * width) = prior_left;
         end
 
-        % foreground
-        fg_d = pixel_distance_func(value_d(:), SOURCE_COLOR);        
-        if (fg_d > PRIOR_SMOOTHNESS)
-            unary(:, pixel) = [0 1]';
+        fg_d = pixel_distance_func(value_d(:), FG_COLOR);
+        if (fg_d < DATA_SMOOTHNESS)
+            unary(:, node_idx) = [1 0]';
         else
-            unary(:, pixel) = [1 0]';
+            unary(:, node_idx) = [0 1]';
         end
 
     end
@@ -83,13 +80,13 @@ end
 [labels E Eafter] = GCMex(segclass, single(unary), pairwise, single(labelcost), 0);
 
 % Denoise the image based on labels is 0 (background) or 1(foreground)
-filter_image = zeros([height_h, width_w, z], 'uint8');
-for row = 0 : height_h - 1
-    for col = 0 : width_w - 1
-        pixel       = 1 + row * width_w + col;
-        pixel_val   =  SINK_COLOR;
-        if labels(pixel) == 1
-            pixel_val = SOURCE_COLOR;
+filter_image = zeros([height, width, z], 'uint8');
+for row = 0 : height - 1
+    for col = 0 : width - 1
+        node_idx       = 1 + row * width + col;
+        pixel_val   =  BG_COLOR;
+        if labels(node_idx) == 1
+            pixel_val = FG_COLOR;
         end
         
         filter_image(row+1, col+1, :) = pixel_val;
@@ -103,5 +100,5 @@ subplot(1,2,2), imshow(filter_image), title("Filter Image");
 function dist = pixel_distance_func(pixel_1, pixel_2)
     [r, h, d]   = size(pixel_1);
     pixel_diff  = int8(pixel_1) - int8(pixel_2);
-    dist        = sum(abs(pixel_diff)) / d;
+    dist        = sum(abs(pixel_diff));
 end
